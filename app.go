@@ -2,6 +2,7 @@ package micro
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -78,20 +79,6 @@ func (a *App) DELETE(path string, handler HandlerFunc) {
 	a.router.Handle(http.MethodDelete, path, handler)
 }
 
-// Any registers a route that matches all the HTTP methods.
-// GET, POST, PUT, PATCH, HEAD, OPTIONS, DELETE, CONNECT, TRACE.
-func (a *App) Any(path string, handler HandlerFunc) {
-	a.router.Handle("GET", path, handler)
-	a.router.Handle("POST", path, handler)
-	a.router.Handle("PUT", path, handler)
-	a.router.Handle("PATCH", path, handler)
-	a.router.Handle("HEAD", path, handler)
-	a.router.Handle("OPTIONS", path, handler)
-	a.router.Handle("DELETE", path, handler)
-	a.router.Handle("CONNECT", path, handler)
-	a.router.Handle("TRACE", path, handler)
-}
-
 func (a *App) allocateContext() *Context {
 	return &Context{}
 }
@@ -118,26 +105,62 @@ func (a *App) dispatchRequest(c *Context) {
 	req := c.Request
 	path := c.Request.URL.Path
 	if root := a.router.trees[req.Method]; root != nil {
-		if route, ps, _ := root.getValue(path); route != nil {
+		if route, ps, tsr := root.getValue(path); route != nil {
 			c.Params = ps
 			a.handleAction(c, route.Handler)
+			return
+		} else if req.Method != http.MethodConnect && path != "/" {
+			code := http.StatusMovedPermanently
+			if req.Method != http.MethodGet {
+				code = http.StatusPermanentRedirect
+			}
+
+			if tsr && a.RedirectTrailingSlash {
+				if len(path) > 1 && path[len(path)-1] == '/' {
+					req.URL.Path = path[:len(path)-1]
+				} else {
+					req.URL.Path = path + "/"
+				}
+				http.Redirect(c.Response, req, req.URL.String(), code)
+				return
+			}
+
+			// Try to fix the request path
+			if a.RedirectFixedPath {
+				fixedPath, found := root.findCaseInsensitivePath(
+					CleanPath(path),
+					a.RedirectTrailingSlash,
+				)
+				if found {
+					req.URL.Path = fixedPath
+					http.Redirect(c.Response, req, req.URL.String(), code)
+					return
+				}
+			}
+		}
+	}
+
+	if a.HandleMethodNotAllowed {
+		if allow := a.router.allowed(path, req.Method); allow != "" {
+			c.Response.Header().Set("Allow", allow)
+			_ = ErrorResult(http.StatusMethodNotAllowed, errors.New(a.Body405)).Handle(c)
 			return
 		}
 	}
 
-	http.NotFound(c.Response, req)
+	_ = ErrorResult(http.StatusNotFound, errors.New(default404Body)).Handle(c)
 }
 
 // handleAction - handles action results and error reporting
 func (a *App) handleAction(c *Context, handler HandlerFunc) {
-	res, err := handler(c)
-	if err != nil {
-		a.Logger.Errorf("action execution returned error: %v", err)
+	res := handler(c)
+
+	if res == nil {
+		a.Logger.Fatal("action result can not be nil")
 	}
 
 	// handle action result from handler
-	err = res.Handle(c)
-	if err != nil {
+	if err := res.Handle(c); err != nil {
 		a.Logger.Errorf("action result returned error: %v", err)
 	}
 }

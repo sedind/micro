@@ -20,7 +20,13 @@ func (c *Context) reset() {
 
 // ContentType returns the Content-Type header of the request.
 func (c *Context) ContentType() string {
-	return filterFlags(c.Request.Header.Get("Content-Type"))
+	ct := c.Request.Header.Get("Content-Type")
+	for i, char := range ct {
+		if char == ' ' || char == ';' {
+			return ct[:i]
+		}
+	}
+	return ct
 }
 
 // SetContentType sets Content-Type header to response
@@ -29,13 +35,4 @@ func (c *Context) SetContentType(value []string) {
 	if val := header["Content-Type"]; len(val) == 0 {
 		header["Content-Type"] = value
 	}
-}
-
-func filterFlags(content string) string {
-	for i, char := range content {
-		if char == ' ' || char == ';' {
-			return content[:i]
-		}
-	}
-	return content
 }

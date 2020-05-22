@@ -13,6 +13,13 @@ const (
 	defaultVersion = "v0.0.0"
 
 	defaultLogLevel = "debug"
+
+	defaultRedirectTrailingSlash  = true
+	defaultRedirectFixedPath      = true
+	defaultHandleMethodNotAllowed = true
+
+	default404Body = "404 page not found"
+	default405Body = "405 method not allowed"
 )
 
 // Options holds flow configuration options
@@ -23,8 +30,14 @@ type Options struct {
 	Version string
 
 	LogLevel string
+	Logger   log.Logger
 
-	Logger log.Logger
+	RedirectTrailingSlash  bool
+	RedirectFixedPath      bool
+	HandleMethodNotAllowed bool
+
+	Body404 string
+	Body405 string
 
 	RequestLoggerIgnore []string
 
@@ -39,6 +52,13 @@ func NewOptions() Options {
 		Version:  defaultVersion,
 		Addr:     defaultAddr,
 		LogLevel: defaultLogLevel,
+
+		RedirectTrailingSlash:  defaultRedirectTrailingSlash,
+		RedirectFixedPath:      defaultRedirectFixedPath,
+		HandleMethodNotAllowed: defaultHandleMethodNotAllowed,
+
+		Body404: default404Body,
+		Body405: default405Body,
 	}
 
 	return opts
