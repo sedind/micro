@@ -2,8 +2,11 @@ package micro
 
 import (
 	"bytes"
+	"fmt"
 	"io"
+	"mime"
 	"net/http"
+	"path/filepath"
 
 	"github.com/sedind/micro/render"
 )
@@ -62,14 +65,58 @@ func RedirectResult(url string, code int) ActionResult {
 	}
 }
 
+type fileResult struct {
+	name   string
+	reader io.Reader
+}
+
+func (fr *fileResult) Handle(c *Context) error {
+
+	h := c.Response.Header()
+
+	ext := filepath.Ext(fr.name)
+	t := mime.TypeByExtension(ext)
+	if t == "" {
+		t = "application/octet-stream"
+	}
+
+	cd := fmt.Sprintf("attachment; filename=%s", fr.name)
+	//cl := strconv.Itoa(int(written))
+	h.Add("Content-Disposition", cd)
+	//h.Add("Content-Length", cl)
+	h.Add("Content-Type", t)
+
+	_, err := io.Copy(c.Response, fr.reader)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+// FileResult creates file attachment ActionResult with following headers:
+//
+//   Content-Type
+//   Content-Length
+//   Content-Disposition
+//
+// Content-Type is set using mime#TypeByExtension with the filename's extension. Content-Type will default to
+// application/octet-stream if using a filename with an unknown extension.
+func FileResult(name string, reader io.Reader) ActionResult {
+	return &fileResult{
+		name:   name,
+		reader: reader,
+	}
+}
+
 // RenderResult handlers different rendering implementations
-type RenderResult struct {
+type renderResult struct {
 	render.Renderer
 	code int
 }
 
 // Handle finalizes Render result
-func (rr *RenderResult) Handle(c *Context) error {
+func (rr *renderResult) Handle(c *Context) error {
 	var res bytes.Buffer
 	if err := rr.Render(&res); err != nil {
 		return err
@@ -85,7 +132,7 @@ func (rr *RenderResult) Handle(c *Context) error {
 
 // RenderJSON creates JSON rendered ActionResult
 func RenderJSON(code int, data interface{}) ActionResult {
-	return &RenderResult{
+	return &renderResult{
 		Renderer: render.JSON{Data: data},
 		code:     code,
 	}
@@ -93,7 +140,7 @@ func RenderJSON(code int, data interface{}) ActionResult {
 
 // RenderText creates Text rendered ActionResult
 func RenderText(code int, text string) ActionResult {
-	return &RenderResult{
+	return &renderResult{
 		Renderer: render.Text{Data: text},
 		code:     code,
 	}
@@ -101,7 +148,7 @@ func RenderText(code int, text string) ActionResult {
 
 // RenderXML creates XML rendered ActionResult
 func RenderXML(code int, data interface{}) ActionResult {
-	return &RenderResult{
+	return &renderResult{
 		Renderer: render.XML{Data: data},
 		code:     code,
 	}
@@ -109,7 +156,7 @@ func RenderXML(code int, data interface{}) ActionResult {
 
 //RenderData creates []byte render ActionResult
 func RenderData(code int, data []byte, contentType []string) ActionResult {
-	return &RenderResult{
+	return &renderResult{
 		Renderer: render.Data{
 			Data:  data,
 			CType: contentType,
@@ -120,7 +167,7 @@ func RenderData(code int, data []byte, contentType []string) ActionResult {
 
 // RenderReader creates io.Reader render ActionResult
 func RenderReader(code int, reader io.Reader, contentType []string) ActionResult {
-	return &RenderResult{
+	return &renderResult{
 		Renderer: render.Reader{
 			Reader: reader,
 			CType:  contentType,

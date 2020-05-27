@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/sedind/micro"
 )
@@ -45,6 +46,11 @@ func main() {
 
 	app.GET("/err", func(ctx *micro.Context) micro.ActionResult {
 		return micro.ErrorResult(http.StatusBadRequest, errors.New("some bad status error"))
+	})
+
+	app.GET("/file", func(ctx *micro.Context) micro.ActionResult {
+		r := strings.NewReader("test.csv this is test file content,something,a,b,c,d,e,f,g,h,i,j,k,l")
+		return micro.FileResult("test.csv", r)
 	})
 
 	if err := app.Serve(); err != nil {
