@@ -45,38 +45,43 @@ func NewWithOptions(opts Options) *App {
 }
 
 // GET is a shortcut for routea.router.Handle(http.MethodGet, path, handler)
-func (a *App) GET(path string, handler HandlerFunc) {
-	a.router.Handle(http.MethodGet, path, handler)
+func (a *App) GET(path string, handler HandlerFunc, middlewares ...MiddlewareHandlerFunc) {
+	a.router.Handle(http.MethodGet, path, handler, middlewares...)
 }
 
 // HEAD is a shortcut for routea.router.Handle(http.MethodHead, path, handler)
-func (a *App) HEAD(path string, handler HandlerFunc) {
-	a.router.Handle(http.MethodHead, path, handler)
+func (a *App) HEAD(path string, handler HandlerFunc, middlewares ...MiddlewareHandlerFunc) {
+	a.router.Handle(http.MethodHead, path, handler, middlewares...)
 }
 
 // OPTIONS is a shortcut for routea.router.Handle(http.MethodOptions, path, handler)
-func (a *App) OPTIONS(path string, handler HandlerFunc) {
-	a.router.Handle(http.MethodOptions, path, handler)
+func (a *App) OPTIONS(path string, handler HandlerFunc, middlewares ...MiddlewareHandlerFunc) {
+	a.router.Handle(http.MethodOptions, path, handler, middlewares...)
 }
 
 // POST is a shortcut for routea.router.Handle(http.MethodPost, path, handler)
-func (a *App) POST(path string, handler HandlerFunc) {
-	a.router.Handle(http.MethodPost, path, handler)
+func (a *App) POST(path string, handler HandlerFunc, middlewares ...MiddlewareHandlerFunc) {
+	a.router.Handle(http.MethodPost, path, handler, middlewares...)
 }
 
 // PUT is a shortcut for routea.router.Handle(http.MethodPut, path, handler)
-func (a *App) PUT(path string, handler HandlerFunc) {
-	a.router.Handle(http.MethodPut, path, handler)
+func (a *App) PUT(path string, handler HandlerFunc, middlewares ...MiddlewareHandlerFunc) {
+	a.router.Handle(http.MethodPut, path, handler, middlewares...)
 }
 
 // PATCH is a shortcut for routea.router.Handle(http.MethodPatch, path, handler)
-func (a *App) PATCH(path string, handler HandlerFunc) {
-	a.router.Handle(http.MethodPatch, path, handler)
+func (a *App) PATCH(path string, handler HandlerFunc, middlewares ...MiddlewareHandlerFunc) {
+	a.router.Handle(http.MethodPatch, path, handler, middlewares...)
 }
 
 // DELETE is a shortcut for routea.router.Handle(http.MethodDelete, path, handler)
-func (a *App) DELETE(path string, handler HandlerFunc) {
-	a.router.Handle(http.MethodDelete, path, handler)
+func (a *App) DELETE(path string, handler HandlerFunc, middlewares ...MiddlewareHandlerFunc) {
+	a.router.Handle(http.MethodDelete, path, handler, middlewares...)
+}
+
+// Use -
+func (a *App) Use(middlewares ...MiddlewareHandlerFunc) {
+	a.router.Use(middlewares...)
 }
 
 func (a *App) allocateContext() *Context {
@@ -93,7 +98,15 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c.Response = w
 
 	// handle the request
-	a.dispatchRequest(c)
+	res := a.dispatchRequest(c)
+	if res == nil {
+		a.Logger.Fatal("action result can not be nil")
+	}
+
+	// handle action result from handler
+	if err := res.Handle(c); err != nil {
+		a.Logger.Errorf("action result returned error: %v", err)
+	}
 
 	// put back context to pool
 	a.pool.Put(c)
@@ -101,14 +114,13 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // dispatchRequest finds appropriate route in routing tree and handles routing rules,
 // binds params with context and forwards action to execution
-func (a *App) dispatchRequest(c *Context) {
+func (a *App) dispatchRequest(c *Context) ActionResult {
 	req := c.Request
 	path := c.Request.URL.Path
 	if root := a.router.trees[req.Method]; root != nil {
 		if route, ps, tsr := root.getValue(path); route != nil {
 			c.Params = ps
-			a.handleAction(c, route.Handler)
-			return
+			return route.HandleRequest(c)
 		} else if req.Method != http.MethodConnect && path != "/" {
 			code := http.StatusMovedPermanently
 			if req.Method != http.MethodGet {
@@ -121,8 +133,7 @@ func (a *App) dispatchRequest(c *Context) {
 				} else {
 					req.URL.Path = path + "/"
 				}
-				http.Redirect(c.Response, req, req.URL.String(), code)
-				return
+				return RedirectResult(req.URL.String(), code)
 			}
 
 			// Try to fix the request path
@@ -133,8 +144,7 @@ func (a *App) dispatchRequest(c *Context) {
 				)
 				if found {
 					req.URL.Path = fixedPath
-					http.Redirect(c.Response, req, req.URL.String(), code)
-					return
+					return RedirectResult(req.URL.String(), code)
 				}
 			}
 		}
@@ -143,26 +153,11 @@ func (a *App) dispatchRequest(c *Context) {
 	if a.HandleMethodNotAllowed {
 		if allow := a.router.allowed(path, req.Method); allow != "" {
 			c.Response.Header().Set("Allow", allow)
-			_ = ErrorResult(http.StatusMethodNotAllowed, errors.New(a.Body405)).Handle(c)
-			return
+			return ErrorResult(http.StatusMethodNotAllowed, errors.New(a.Body405))
 		}
 	}
 
-	_ = ErrorResult(http.StatusNotFound, errors.New(default404Body)).Handle(c)
-}
-
-// handleAction - handles action results and error reporting
-func (a *App) handleAction(c *Context, handler HandlerFunc) {
-	res := handler(c)
-
-	if res == nil {
-		a.Logger.Fatal("action result can not be nil")
-	}
-
-	// handle action result from handler
-	if err := res.Handle(c); err != nil {
-		a.Logger.Errorf("action result returned error: %v", err)
-	}
+	return ErrorResult(http.StatusNotFound, errors.New(default404Body))
 }
 
 // Serve the application at the specified address/port and listen for OS

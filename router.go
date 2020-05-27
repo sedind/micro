@@ -14,62 +14,55 @@ import (
 type Router struct {
 	trees map[string]*node
 
-	mws []HandlerFunc
+	mws *MiddlewareStack
 }
 
 // NewRouter returns a new initialized Router.
 // Path auto-correction, including trailing slashes, is enabled by default.
 func NewRouter() *Router {
-	return &Router{}
+	return &Router{
+		mws: new(MiddlewareStack),
+	}
 }
 
 // GET is a shortcut for router.Handle(http.MethodGet, path, handler)
-func (r *Router) GET(path string, handler HandlerFunc) {
-	r.Handle(http.MethodGet, path, handler)
+func (r *Router) GET(path string, handler HandlerFunc, middlewares ...MiddlewareHandlerFunc) {
+	r.Handle(http.MethodGet, path, handler, middlewares...)
 }
 
 // HEAD is a shortcut for router.Handle(http.MethodHead, path, handler)
-func (r *Router) HEAD(path string, handler HandlerFunc) {
-	r.Handle(http.MethodHead, path, handler)
+func (r *Router) HEAD(path string, handler HandlerFunc, middlewares ...MiddlewareHandlerFunc) {
+	r.Handle(http.MethodHead, path, handler, middlewares...)
 }
 
 // OPTIONS is a shortcut for router.Handle(http.MethodOptions, path, handler)
-func (r *Router) OPTIONS(path string, handler HandlerFunc) {
-	r.Handle(http.MethodOptions, path, handler)
+func (r *Router) OPTIONS(path string, handler HandlerFunc, middlewares ...MiddlewareHandlerFunc) {
+	r.Handle(http.MethodOptions, path, handler, middlewares...)
 }
 
 // POST is a shortcut for router.Handle(http.MethodPost, path, handler)
-func (r *Router) POST(path string, handler HandlerFunc) {
-	r.Handle(http.MethodPost, path, handler)
+func (r *Router) POST(path string, handler HandlerFunc, middlewares ...MiddlewareHandlerFunc) {
+	r.Handle(http.MethodPost, path, handler, middlewares...)
 }
 
 // PUT is a shortcut for router.Handle(http.MethodPut, path, handler)
-func (r *Router) PUT(path string, handler HandlerFunc) {
-	r.Handle(http.MethodPut, path, handler)
+func (r *Router) PUT(path string, handler HandlerFunc, middlewares ...MiddlewareHandlerFunc) {
+	r.Handle(http.MethodPut, path, handler, middlewares...)
 }
 
 // PATCH is a shortcut for router.Handle(http.MethodPatch, path, handler)
-func (r *Router) PATCH(path string, handler HandlerFunc) {
-	r.Handle(http.MethodPatch, path, handler)
+func (r *Router) PATCH(path string, handler HandlerFunc, middlewares ...MiddlewareHandlerFunc) {
+	r.Handle(http.MethodPatch, path, handler, middlewares...)
 }
 
 // DELETE is a shortcut for router.Handle(http.MethodDelete, path, handler)
-func (r *Router) DELETE(path string, handler HandlerFunc) {
-	r.Handle(http.MethodDelete, path, handler)
+func (r *Router) DELETE(path string, handler HandlerFunc, middlewares ...MiddlewareHandlerFunc) {
+	r.Handle(http.MethodDelete, path, handler, middlewares...)
 }
 
-// Any registers a route that matches all the HTTP methods.
-// GET, POST, PUT, PATCH, HEAD, OPTIONS, DELETE, CONNECT, TRACE.
-func (r *Router) Any(path string, handler HandlerFunc) {
-	r.Handle("GET", path, handler)
-	r.Handle("POST", path, handler)
-	r.Handle("PUT", path, handler)
-	r.Handle("PATCH", path, handler)
-	r.Handle("HEAD", path, handler)
-	r.Handle("OPTIONS", path, handler)
-	r.Handle("DELETE", path, handler)
-	r.Handle("CONNECT", path, handler)
-	r.Handle("TRACE", path, handler)
+// Use appends one or more middlewares to middleware stack.
+func (r *Router) Use(mw ...MiddlewareHandlerFunc) {
+	r.mws.Append(mw...)
 }
 
 // Handle registers a new request handle with the given path and method.
@@ -80,7 +73,7 @@ func (r *Router) Any(path string, handler HandlerFunc) {
 // This function is intended for bulk loading and to allow the usage of less
 // frequently used, non-standardized or custom methods (e.g. for internal
 // communication with a proxy).
-func (r *Router) Handle(method, path string, handler HandlerFunc) {
+func (r *Router) Handle(method, path string, handler HandlerFunc, middlewares ...MiddlewareHandlerFunc) {
 	//varsCount := uint16(0)
 
 	if method == "" {
@@ -106,6 +99,7 @@ func (r *Router) Handle(method, path string, handler HandlerFunc) {
 	route := &Route{
 		Method:  method,
 		Path:    path,
+		Mws:     r.mws.Clone(middlewares...),
 		Handler: handler,
 	}
 
