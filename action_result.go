@@ -66,11 +66,27 @@ func RedirectResult(url string, code int) ActionResult {
 }
 
 type fileResult struct {
+	filepath string
+}
+
+func (rf *fileResult) Handle(c *Context) error {
+	http.ServeFile(c.Response, c.Request, rf.filepath)
+	return nil
+}
+
+// FileResult writes the specified file into the body stream in a efficient way.
+func FileResult(filePath string) ActionResult {
+	return &fileResult{
+		filepath: filePath,
+	}
+}
+
+type downloadResult struct {
 	name   string
 	reader io.Reader
 }
 
-func (fr *fileResult) Handle(c *Context) error {
+func (fr *downloadResult) Handle(c *Context) error {
 
 	h := c.Response.Header()
 
@@ -94,7 +110,7 @@ func (fr *fileResult) Handle(c *Context) error {
 	return err
 }
 
-// FileResult creates file attachment ActionResult with following headers:
+// DownloadResult creates file attachment ActionResult with following headers:
 //
 //   Content-Type
 //   Content-Length
@@ -102,8 +118,8 @@ func (fr *fileResult) Handle(c *Context) error {
 //
 // Content-Type is set using mime#TypeByExtension with the filename's extension. Content-Type will default to
 // application/octet-stream if using a filename with an unknown extension.
-func FileResult(name string, reader io.Reader) ActionResult {
-	return &fileResult{
+func DownloadResult(name string, reader io.Reader) ActionResult {
+	return &downloadResult{
 		name:   name,
 		reader: reader,
 	}
@@ -134,6 +150,14 @@ func (rr *renderResult) Handle(c *Context) error {
 func RenderJSON(code int, data interface{}) ActionResult {
 	return &renderResult{
 		Renderer: render.JSON{Data: data},
+		code:     code,
+	}
+}
+
+// RenderYAML creates YAML rendered ActionResult
+func RenderYAML(code int, data interface{}) ActionResult {
+	return &renderResult{
+		Renderer: render.YAML{Data: data},
 		code:     code,
 	}
 }
