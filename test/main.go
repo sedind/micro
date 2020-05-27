@@ -50,7 +50,7 @@ func main() {
 
 	app.GET("/file", func(ctx *micro.Context) micro.ActionResult {
 		r := strings.NewReader("test.csv this is test file content,something,a,b,c,d,e,f,g,h,i,j,k,l")
-		return micro.FileResult("test.csv", r)
+		return micro.FileResult("test.txt", r)
 	})
 
 	if err := app.Serve(); err != nil {
