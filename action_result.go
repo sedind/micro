@@ -25,14 +25,16 @@ func (er *errorResult) Handle(c *Context) error {
 	var res ActionResult
 	switch c.ContentType() {
 	case MIMEJSON:
-		res = RenderJSON(er.code, VM{"error": er.err.Error()})
+		res = JSONResult(er.code, VM{"error": er.err.Error()})
+	case MIMEYAML:
+		res = YAMLResult(er.code, VM{"error": er.err.Error()})
 	case MIMEXML, MIMEXML2:
 		type Error struct {
 			Message string
 		}
-		res = RenderXML(er.code, &Error{Message: er.err.Error()})
+		res = XMLResult(er.code, &Error{Message: er.err.Error()})
 	default:
-		res = RenderText(er.code, er.err.Error())
+		res = TextResult(er.code, er.err.Error())
 	}
 
 	return res.Handle(c)
@@ -146,40 +148,40 @@ func (rr *renderResult) Handle(c *Context) error {
 	return err
 }
 
-// RenderJSON creates JSON rendered ActionResult
-func RenderJSON(code int, data interface{}) ActionResult {
+// JSONResult creates JSON rendered ActionResult
+func JSONResult(code int, data interface{}) ActionResult {
 	return &renderResult{
 		Renderer: render.JSON{Data: data},
 		code:     code,
 	}
 }
 
-// RenderYAML creates YAML rendered ActionResult
-func RenderYAML(code int, data interface{}) ActionResult {
+// YAMLResult creates YAML rendered ActionResult
+func YAMLResult(code int, data interface{}) ActionResult {
 	return &renderResult{
 		Renderer: render.YAML{Data: data},
 		code:     code,
 	}
 }
 
-// RenderText creates Text rendered ActionResult
-func RenderText(code int, text string) ActionResult {
+// TextResult creates Text rendered ActionResult
+func TextResult(code int, text string) ActionResult {
 	return &renderResult{
 		Renderer: render.Text{Data: text},
 		code:     code,
 	}
 }
 
-// RenderXML creates XML rendered ActionResult
-func RenderXML(code int, data interface{}) ActionResult {
+// XMLResult creates XML rendered ActionResult
+func XMLResult(code int, data interface{}) ActionResult {
 	return &renderResult{
 		Renderer: render.XML{Data: data},
 		code:     code,
 	}
 }
 
-//RenderData creates []byte render ActionResult
-func RenderData(code int, data []byte, contentType []string) ActionResult {
+//DataResult creates []byte render ActionResult
+func DataResult(code int, data []byte, contentType []string) ActionResult {
 	return &renderResult{
 		Renderer: render.Data{
 			Data:  data,
@@ -189,8 +191,8 @@ func RenderData(code int, data []byte, contentType []string) ActionResult {
 	}
 }
 
-// RenderReader creates io.Reader render ActionResult
-func RenderReader(code int, reader io.Reader, contentType []string) ActionResult {
+// ReaderResult creates io.Reader render ActionResult
+func ReaderResult(code int, reader io.Reader, contentType []string) ActionResult {
 	return &renderResult{
 		Renderer: render.Reader{
 			Reader: reader,

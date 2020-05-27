@@ -96,6 +96,7 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c.reset()
 	c.Request = r
 	c.Response = w
+	c.Logger = a.Logger
 
 	// handle the request
 	res := a.dispatchRequest(c)

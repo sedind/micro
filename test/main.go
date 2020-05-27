@@ -12,7 +12,15 @@ func main() {
 	app := micro.New()
 
 	app.GET("/", func(ctx *micro.Context) micro.ActionResult {
-		return micro.RenderJSON(
+		return micro.JSONResult(
+			http.StatusOK,
+			micro.VM{
+				"HEllo": "world",
+			})
+	})
+
+	app.GET("/yaml", func(ctx *micro.Context) micro.ActionResult {
+		return micro.YAMLResult(
 			http.StatusOK,
 			micro.VM{
 				"HEllo": "world",
@@ -26,7 +34,7 @@ func main() {
 			Heading string
 			Body    string
 		}
-		return micro.RenderXML(
+		return micro.XMLResult(
 			http.StatusOK,
 			&Note{
 				To:      "John",
@@ -37,20 +45,24 @@ func main() {
 	})
 
 	app.GET("/text", func(ctx *micro.Context) micro.ActionResult {
-		return micro.RenderText(http.StatusOK, "Hello World")
+		return micro.TextResult(http.StatusOK, "Hello World")
 	})
 
 	app.GET("/data", func(ctx *micro.Context) micro.ActionResult {
-		return micro.RenderData(http.StatusOK, []byte("Hello World"), []string{"text/plain; charset=utf-8"})
+		return micro.DataResult(http.StatusOK, []byte("Hello World"), []string{"text/plain; charset=utf-8"})
 	})
 
 	app.GET("/err", func(ctx *micro.Context) micro.ActionResult {
 		return micro.ErrorResult(http.StatusBadRequest, errors.New("some bad status error"))
 	})
 
-	app.GET("/file", func(ctx *micro.Context) micro.ActionResult {
+	app.GET("/download", func(ctx *micro.Context) micro.ActionResult {
 		r := strings.NewReader("test.csv this is test file content,something,a,b,c,d,e,f,g,h,i,j,k,l")
-		return micro.FileResult("test.txt", r)
+		return micro.DownloadResult("test.txt", r)
+	})
+
+	app.GET("/file", func(ctx *micro.Context) micro.ActionResult {
+		return micro.FileResult("go.mod")
 	})
 
 	if err := app.Serve(); err != nil {
