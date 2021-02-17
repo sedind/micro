@@ -8,8 +8,25 @@ import (
 	"github.com/sedind/micro"
 )
 
+func DoSomething(action string) micro.MiddlewareHandlerFunc {
+	return func(next micro.MiddlewareFunc) micro.MiddlewareFunc {
+		return func(c *micro.Context) error {
+			// do something before calling the next handler
+			c.Logger.Infof("Do something %s befor next handler", action)
+			err := next(c)
+			// do something after call the handler
+			c.Logger.Infof("Do something %s after next handler", action)
+			return err
+		}
+	}
+}
+
 func main() {
 	app := micro.New()
+
+	app.Use(DoSomething("1"))
+	app.Use(DoSomething("2"))
+	app.Use(DoSomething("3"))
 
 	app.GET("/", func(ctx *micro.Context) micro.ActionResult {
 		return micro.JSONResult(

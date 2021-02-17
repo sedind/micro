@@ -12,6 +12,9 @@ type Route struct {
 	Handler HandlerFunc
 }
 
+// Routes defines a Route array.
+type Routes []Route
+
 // HandleRequest handles user request
 func (r *Route) HandleRequest(c *Context) ActionResult {
 	if err := r.Mws.handle(c); err != nil {
